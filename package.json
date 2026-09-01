@@ -1,6 +1,7 @@
 {
   "name": "load-shedding-power-outage-management-api",
   "version": "1.0.0",
+  "type": "module",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -13,7 +14,6 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "bugs": {
     "url": "https://github.com/RizBits14/load-shedding-power-outage-management-api/issues"
   },
@@ -25,7 +25,10 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "pg": "^8.23.0"
   }
 }

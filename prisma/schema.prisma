@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  CUSTOMER
+  OPERATOR
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+model User {
+  id       String     @id @default(cuid())
+  name     String
+  email    String     @unique
+  password String?
+  googleId String?    @unique
+  role     Role       @default(CUSTOMER)
+  status   UserStatus @default(ACTIVE)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([role])
+  @@index([status])
+  @@index([createdAt])
+}
