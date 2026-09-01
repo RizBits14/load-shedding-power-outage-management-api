@@ -1,7 +1,10 @@
 import type { Request, Response } from "express";
 
 import { prisma } from "../../lib/prisma.js";
-import { createZoneSchema } from "./zone.validation.js";
+import {
+    createZoneSchema,
+    updateZoneSchema,
+} from "./zone.validation.js";
 
 export const createZone = async (req: Request, res: Response) => {
     try {
@@ -119,6 +122,145 @@ export const getZoneById = async (
         });
     } catch (error) {
         console.error("Get zone error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
+    }
+};
+
+export const updateZone = async (
+    req: Request<{ id: string }>,
+    res: Response,
+) => {
+    try {
+        const { id } = req.params;
+
+        const result = updateZoneSchema.safeParse(req.body);
+
+        if (!result.success) {
+            return res.status(400).json({
+                success: false,
+                message: "Validation failed",
+                errors: result.error.flatten(),
+            });
+        }
+
+        const existingZone = await prisma.zone.findFirst({
+            where: {
+                id,
+                deletedAt: null,
+            },
+        });
+
+        if (!existingZone) {
+            return res.status(404).json({
+                success: false,
+                message: "Zone not found",
+            });
+        }
+
+        const { name, code, description } = result.data;
+
+        if (name || code) {
+            const duplicateZone = await prisma.zone.findFirst({
+                where: {
+                    id: {
+                        not: id,
+                    },
+                    OR: [
+                        ...(name
+                            ? [
+                                {
+                                    name: {
+                                        equals: name,
+                                        mode: "insensitive" as const,
+                                    },
+                                },
+                            ]
+                            : []),
+                        ...(code
+                            ? [
+                                {
+                                    code: code.toUpperCase(),
+                                },
+                            ]
+                            : []),
+                    ],
+                },
+            });
+
+            if (duplicateZone) {
+                return res.status(409).json({
+                    success: false,
+                    message: "Zone with this name or code already exists",
+                });
+            }
+        }
+
+        const updatedZone = await prisma.zone.update({
+            where: {
+                id,
+            },
+            data: {
+                ...(name !== undefined && { name }),
+                ...(code !== undefined && { code: code.toUpperCase() }),
+                ...(description !== undefined && { description }),
+            },
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Zone updated successfully",
+            data: updatedZone,
+        });
+    } catch (error) {
+        console.error("Update zone error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
+    }
+};
+
+export const deleteZone = async (
+    req: Request<{ id: string }>,
+    res: Response,
+) => {
+    try {
+        const { id } = req.params;
+
+        const zone = await prisma.zone.findFirst({
+            where: {
+                id,
+                deletedAt: null,
+            },
+        });
+
+        if (!zone) {
+            return res.status(404).json({
+                success: false,
+                message: "Zone not found",
+            });
+        }
+
+        await prisma.zone.update({
+            where: {
+                id,
+            },
+            data: {
+                deletedAt: new Date(),
+            },
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Zone deleted successfully",
+        });
+    } catch (error) {
+        console.error("Delete zone error:", error);
 
         return res.status(500).json({
             success: false,

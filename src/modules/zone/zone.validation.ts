@@ -25,3 +25,10 @@ export const createZoneSchema = z
             .optional(),
     })
     .strict();
+
+export const updateZoneSchema = createZoneSchema.partial().refine(
+    (data) => Object.keys(data).length > 0,
+    {
+        message: "At least one field is required",
+    },
+);
