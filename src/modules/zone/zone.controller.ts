@@ -246,6 +246,20 @@ export const deleteZone = async (
             });
         }
 
+        const substationCount = await prisma.substation.count({
+            where: {
+                zoneId: id,
+                deletedAt: null,
+            },
+        });
+
+        if (substationCount > 0) {
+            return res.status(409).json({
+                success: false,
+                message: "Zone cannot be deleted while it contains substations",
+            });
+        }
+
         await prisma.zone.update({
             where: {
                 id,
