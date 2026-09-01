@@ -1,0 +1,7 @@
+import app from "./app.js";
+
+const PORT = 5000;
+
+app.listen(PORT, () => {
+    console.log(`PowerSync server is running on port ${PORT}`);
+});
