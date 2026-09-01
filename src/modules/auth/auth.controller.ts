@@ -152,3 +152,11 @@ export const loginUser = async (req: Request, res: Response) => {
         });
     }
 };
+
+export const getMe = async (_req: Request, res: Response) => {
+    return res.status(200).json({
+        success: true,
+        message: "Current user retrieved successfully",
+        data: res.locals.user,
+    });
+};
