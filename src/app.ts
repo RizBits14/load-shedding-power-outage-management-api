@@ -10,30 +10,23 @@ import customerRouter from "./modules/customer/customer.route.js";
 import scheduleRouter from "./modules/schedule/schedule.route.js";
 import outageReportRouter from "./modules/outage-report/outage-report.route.js";
 import incidentRouter from "./modules/incident/incident.route.js";
+import assignmentRouter from "./modules/assignment/assignment.route.js";
 
 const app = express();
 
 app.use(express.json());
 
 app.use("/api/v1/auth", authRouter);
-
 app.use("/api/v1/admin", adminRouter);
-
 app.use("/api/v1/zones", zoneRouter);
-
 app.use("/api/v1/substations", substationRouter);
-
 app.use("/api/v1/feeders", feederRouter);
-
 app.use("/api/v1/areas", areaRouter);
-
 app.use("/api/v1/customers", customerRouter);
-
 app.use("/api/v1/schedules", scheduleRouter);
-
 app.use("/api/v1/outage-reports", outageReportRouter);
-
 app.use("/api/v1/incidents", incidentRouter);
+app.use("/api/v1/assignments", assignmentRouter);
 
 app.get("/api/v1/health", async (_req, res) => {
     await prisma.$queryRaw`SELECT 1`;

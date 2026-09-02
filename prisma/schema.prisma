@@ -68,6 +68,14 @@ enum IncidentSeverity {
   CRITICAL
 }
 
+enum AssignmentStatus {
+  ASSIGNED
+  ACCEPTED
+  COMPLETED
+  REASSIGNED
+  CANCELLED
+}
+
 model User {
   id       String  @id @default(cuid())
   name     String
@@ -81,11 +89,13 @@ model User {
   customerProfile CustomerProfile?
 
   createdSchedules OutageSchedule[]
-
   createdIncidents OutageIncident[] @relation("CreatedIncidents")
 
   outageReports         OutageReport[] @relation("CustomerOutageReports")
   reviewedOutageReports OutageReport[] @relation("ReviewedOutageReports")
+
+  operatorAssignments IncidentAssignment[] @relation("AssignedOperator")
+  assignmentsCreated  IncidentAssignment[] @relation("AssignmentCreatedBy")
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -277,11 +287,15 @@ model OutageIncident {
   createdById String
   createdBy   User   @relation("CreatedIncidents", fields: [createdById], references: [id])
 
-  reports OutageReport[]
+  reports     OutageReport[]
+  assignments IncidentAssignment[]
 
   startedAt  DateTime
   restoredAt DateTime?
   closedAt   DateTime?
+
+  cancelledAt        DateTime?
+  cancellationReason String?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -294,4 +308,34 @@ model OutageIncident {
   @@index([priorityScore])
   @@index([startedAt])
   @@index([deletedAt])
+}
+
+model IncidentAssignment {
+  id     String           @id @default(cuid())
+  status AssignmentStatus @default(ASSIGNED)
+  note   String?
+
+  incidentId String
+  incident   OutageIncident @relation(fields: [incidentId], references: [id])
+
+  operatorId String
+  operator   User   @relation("AssignedOperator", fields: [operatorId], references: [id])
+
+  assignedById String
+  assignedBy   User   @relation("AssignmentCreatedBy", fields: [assignedById], references: [id])
+
+  assignedAt    DateTime  @default(now())
+  acceptedAt    DateTime?
+  workStartedAt DateTime?
+  completedAt   DateTime?
+  reassignedAt  DateTime?
+  cancelledAt   DateTime?
+
+  updatedAt DateTime @updatedAt
+
+  @@index([incidentId])
+  @@index([operatorId])
+  @@index([assignedById])
+  @@index([status])
+  @@index([assignedAt])
 }

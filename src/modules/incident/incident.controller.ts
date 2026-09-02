@@ -368,6 +368,14 @@ export const getIncidentById = async (
                                 email: true,
                             },
                         },
+
+                        reviewedBy: {
+                            select: {
+                                id: true,
+                                name: true,
+                                role: true,
+                            },
+                        },
                     },
                 },
 
