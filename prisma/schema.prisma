@@ -38,6 +38,20 @@ enum ScheduleStatus {
   CANCELLED
 }
 
+enum OutageReportStatus {
+  PENDING
+  VERIFIED
+  LINKED
+  REJECTED
+}
+
+enum OutageIssueType {
+  TOTAL_OUTAGE
+  PARTIAL_OUTAGE
+  VOLTAGE_FLUCTUATION
+  OTHER
+}
+
 model User {
   id       String  @id @default(cuid())
   name     String
@@ -48,8 +62,12 @@ model User {
   role   Role       @default(CUSTOMER)
   status UserStatus @default(ACTIVE)
 
-  customerProfile  CustomerProfile?
+  customerProfile CustomerProfile?
+
   createdSchedules OutageSchedule[]
+
+  outageReports         OutageReport[] @relation("CustomerOutageReports")
+  reviewedOutageReports OutageReport[] @relation("ReviewedOutageReports")
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -134,8 +152,9 @@ model Area {
   feederId String
   feeder   Feeder @relation(fields: [feederId], references: [id])
 
-  customers CustomerProfile[]
-  schedules OutageSchedule[]
+  customers     CustomerProfile[]
+  schedules     OutageSchedule[]
+  outageReports OutageReport[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -188,4 +207,33 @@ model OutageSchedule {
   @@index([startTime])
   @@index([endTime])
   @@index([deletedAt])
+}
+
+model OutageReport {
+  id          String             @id @default(cuid())
+  issueType   OutageIssueType
+  description String?
+  status      OutageReportStatus @default(PENDING)
+
+  customerId String
+  customer   User   @relation("CustomerOutageReports", fields: [customerId], references: [id])
+
+  areaId String
+  area   Area   @relation(fields: [areaId], references: [id])
+
+  reviewedById String?
+  reviewedBy   User?   @relation("ReviewedOutageReports", fields: [reviewedById], references: [id])
+
+  reviewedAt DateTime?
+  reviewNote String?
+
+  reportedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([areaId])
+  @@index([status])
+  @@index([issueType])
+  @@index([reviewedById])
+  @@index([reportedAt])
 }
