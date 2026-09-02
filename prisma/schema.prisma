@@ -30,16 +30,26 @@ enum AreaPriority {
   CRITICAL
 }
 
-model User {
-  id       String     @id @default(cuid())
-  name     String
-  email    String     @unique
-  password String?
-  googleId String?    @unique
-  role     Role       @default(CUSTOMER)
-  status   UserStatus @default(ACTIVE)
+enum ScheduleStatus {
+  DRAFT
+  PUBLISHED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
 
-  customerProfile CustomerProfile?
+model User {
+  id       String  @id @default(cuid())
+  name     String
+  email    String  @unique
+  password String?
+  googleId String? @unique
+
+  role   Role       @default(CUSTOMER)
+  status UserStatus @default(ACTIVE)
+
+  customerProfile  CustomerProfile?
+  createdSchedules OutageSchedule[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -51,10 +61,11 @@ model User {
 }
 
 model Zone {
-  id          String       @id @default(cuid())
-  name        String       @unique
-  code        String       @unique
+  id          String  @id @default(cuid())
+  name        String  @unique
+  code        String  @unique
   description String?
+
   substations Substation[]
 
   createdAt DateTime  @default(now())
@@ -98,11 +109,11 @@ model Feeder {
   substationId String
   substation   Substation @relation(fields: [substationId], references: [id])
 
+  areas Area[]
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
-
-  areas Area[]
 
   @@unique([substationId, name])
   @@index([substationId])
@@ -111,12 +122,11 @@ model Feeder {
 }
 
 model Area {
-  id          String  @id @default(cuid())
+  id          String       @id @default(cuid())
   name        String
-  code        String  @unique
+  code        String       @unique
   description String?
-
-  priority AreaPriority @default(NORMAL)
+  priority    AreaPriority @default(NORMAL)
 
   latitude  Float?
   longitude Float?
@@ -125,6 +135,7 @@ model Area {
   feeder   Feeder @relation(fields: [feederId], references: [id])
 
   customers CustomerProfile[]
+  schedules OutageSchedule[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -137,8 +148,7 @@ model Area {
 }
 
 model CustomerProfile {
-  id String @id @default(cuid())
-
+  id      String  @id @default(cuid())
   phone   String?
   address String?
 
@@ -152,4 +162,30 @@ model CustomerProfile {
   updatedAt DateTime @updatedAt
 
   @@index([areaId])
+}
+
+model OutageSchedule {
+  id        String         @id @default(cuid())
+  title     String
+  reason    String?
+  startTime DateTime
+  endTime   DateTime
+  status    ScheduleStatus @default(DRAFT)
+
+  areaId String
+  area   Area   @relation(fields: [areaId], references: [id])
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([areaId])
+  @@index([createdById])
+  @@index([status])
+  @@index([startTime])
+  @@index([endTime])
+  @@index([deletedAt])
 }
