@@ -52,6 +52,22 @@ enum OutageIssueType {
   OTHER
 }
 
+enum IncidentStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  RESTORED
+  CLOSED
+  CANCELLED
+}
+
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
 model User {
   id       String  @id @default(cuid())
   name     String
@@ -65,6 +81,8 @@ model User {
   customerProfile CustomerProfile?
 
   createdSchedules OutageSchedule[]
+
+  createdIncidents OutageIncident[] @relation("CreatedIncidents")
 
   outageReports         OutageReport[] @relation("CustomerOutageReports")
   reviewedOutageReports OutageReport[] @relation("ReviewedOutageReports")
@@ -156,6 +174,8 @@ model Area {
   schedules     OutageSchedule[]
   outageReports OutageReport[]
 
+  incidents OutageIncident[]
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -221,6 +241,9 @@ model OutageReport {
   areaId String
   area   Area   @relation(fields: [areaId], references: [id])
 
+  incidentId String?
+  incident   OutageIncident? @relation(fields: [incidentId], references: [id])
+
   reviewedById String?
   reviewedBy   User?   @relation("ReviewedOutageReports", fields: [reviewedById], references: [id])
 
@@ -236,4 +259,39 @@ model OutageReport {
   @@index([issueType])
   @@index([reviewedById])
   @@index([reportedAt])
+  @@index([incidentId])
+}
+
+model OutageIncident {
+  id            String           @id @default(cuid())
+  incidentCode  String           @unique
+  title         String
+  summary       String?
+  status        IncidentStatus   @default(OPEN)
+  severity      IncidentSeverity @default(MEDIUM)
+  priorityScore Int              @default(0)
+
+  areaId String
+  area   Area   @relation(fields: [areaId], references: [id])
+
+  createdById String
+  createdBy   User   @relation("CreatedIncidents", fields: [createdById], references: [id])
+
+  reports OutageReport[]
+
+  startedAt  DateTime
+  restoredAt DateTime?
+  closedAt   DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([areaId])
+  @@index([createdById])
+  @@index([status])
+  @@index([severity])
+  @@index([priorityScore])
+  @@index([startedAt])
+  @@index([deletedAt])
 }

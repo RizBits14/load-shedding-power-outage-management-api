@@ -9,6 +9,7 @@ import areaRouter from "./modules/area/area.route.js";
 import customerRouter from "./modules/customer/customer.route.js";
 import scheduleRouter from "./modules/schedule/schedule.route.js";
 import outageReportRouter from "./modules/outage-report/outage-report.route.js";
+import incidentRouter from "./modules/incident/incident.route.js";
 
 const app = express();
 
@@ -31,6 +32,8 @@ app.use("/api/v1/customers", customerRouter);
 app.use("/api/v1/schedules", scheduleRouter);
 
 app.use("/api/v1/outage-reports", outageReportRouter);
+
+app.use("/api/v1/incidents", incidentRouter);
 
 app.get("/api/v1/health", async (_req, res) => {
     await prisma.$queryRaw`SELECT 1`;
