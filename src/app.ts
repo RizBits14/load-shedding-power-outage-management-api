@@ -17,6 +17,7 @@ import paymentWebhookRouter from "./modules/payment/payment-webhook.route.js";
 import analyticsRouter from "./modules/analytics/analytics.route.js";
 import notificationRouter from "./modules/notification/notification.route.js";
 import auditRouter from "./modules/audit/audit.route.js";
+import googleAuthRouter from "./modules/auth/google-auth.route.js";
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use(
 app.use(express.json());
 
 app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/auth", googleAuthRouter);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/zones", zoneRouter);
 app.use("/api/v1/substations", substationRouter);
