@@ -4,6 +4,7 @@ import authRouter from "./modules/auth/auth.route.js";
 import adminRouter from "./modules/admin/admin.route.js";
 import zoneRouter from "./modules/zone/zone.route.js";
 import substationRouter from "./modules/substation/substation.route.js";
+import feederRouter from "./modules/feeder/feeder.route.js";
 
 const app = express();
 
@@ -16,6 +17,8 @@ app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/zones", zoneRouter);
 
 app.use("/api/v1/substations", substationRouter);
+
+app.use("/api/v1/feeders", feederRouter);
 
 app.get("/api/v1/health", async (_req, res) => {
     await prisma.$queryRaw`SELECT 1`;

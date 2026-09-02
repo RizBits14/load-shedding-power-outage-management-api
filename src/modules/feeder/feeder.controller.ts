@@ -2,16 +2,16 @@ import type { Request, Response } from "express";
 
 import { prisma } from "../../lib/prisma.js";
 import {
-    createSubstationSchema,
-    updateSubstationSchema,
-} from "./substation.validation.js";
+    createFeederSchema,
+    updateFeederSchema,
+} from "./feeder.validation.js";
 
-export const createSubstation = async (
+export const createFeeder = async (
     req: Request,
     res: Response,
 ) => {
     try {
-        const result = createSubstationSchema.safeParse(req.body);
+        const result = createFeederSchema.safeParse(req.body);
 
         if (!result.success) {
             return res.status(400).json({
@@ -21,32 +21,38 @@ export const createSubstation = async (
             });
         }
 
-        const { name, code, description, zoneId } = result.data;
+        const {
+            name,
+            code,
+            description,
+            capacityMw,
+            substationId,
+        } = result.data;
 
-        const zone = await prisma.zone.findFirst({
+        const substation = await prisma.substation.findFirst({
             where: {
-                id: zoneId,
+                id: substationId,
                 deletedAt: null,
             },
         });
 
-        if (!zone) {
+        if (!substation) {
             return res.status(404).json({
                 success: false,
-                message: "Zone not found",
+                message: "Substation not found",
             });
         }
 
         const normalizedCode = code.toUpperCase();
 
-        const duplicate = await prisma.substation.findFirst({
+        const duplicate = await prisma.feeder.findFirst({
             where: {
                 OR: [
                     {
                         code: normalizedCode,
                     },
                     {
-                        zoneId,
+                        substationId,
                         name: {
                             equals: name,
                             mode: "insensitive",
@@ -59,23 +65,31 @@ export const createSubstation = async (
         if (duplicate) {
             return res.status(409).json({
                 success: false,
-                message: "Substation already exists",
+                message: "Feeder already exists",
             });
         }
 
-        const substation = await prisma.substation.create({
+        const feeder = await prisma.feeder.create({
             data: {
                 name,
                 code: normalizedCode,
                 description,
-                zoneId,
+                capacityMw,
+                substationId,
             },
             include: {
-                zone: {
+                substation: {
                     select: {
                         id: true,
                         name: true,
                         code: true,
+                        zone: {
+                            select: {
+                                id: true,
+                                name: true,
+                                code: true,
+                            },
+                        },
                     },
                 },
             },
@@ -83,11 +97,11 @@ export const createSubstation = async (
 
         return res.status(201).json({
             success: true,
-            message: "Substation created successfully",
-            data: substation,
+            message: "Feeder created successfully",
+            data: feeder,
         });
     } catch (error) {
-        console.error("Create substation error:", error);
+        console.error("Create feeder error:", error);
 
         return res.status(500).json({
             success: false,
@@ -96,23 +110,23 @@ export const createSubstation = async (
     }
 };
 
-export const getSubstations = async (
+export const getFeeders = async (
     req: Request,
     res: Response,
 ) => {
     try {
-        const zoneId =
-            typeof req.query.zoneId === "string"
-                ? req.query.zoneId
+        const substationId =
+            typeof req.query.substationId === "string"
+                ? req.query.substationId
                 : undefined;
 
-        const substations = await prisma.substation.findMany({
+        const feeders = await prisma.feeder.findMany({
             where: {
                 deletedAt: null,
-                ...(zoneId && { zoneId }),
+                ...(substationId && { substationId }),
             },
             include: {
-                zone: {
+                substation: {
                     select: {
                         id: true,
                         name: true,
@@ -127,11 +141,11 @@ export const getSubstations = async (
 
         return res.status(200).json({
             success: true,
-            message: "Substations retrieved successfully",
-            data: substations,
+            message: "Feeders retrieved successfully",
+            data: feeders,
         });
     } catch (error) {
-        console.error("Get substations error:", error);
+        console.error("Get feeders error:", error);
 
         return res.status(500).json({
             success: false,
@@ -140,43 +154,50 @@ export const getSubstations = async (
     }
 };
 
-export const getSubstationById = async (
+export const getFeederById = async (
     req: Request<{ id: string }>,
     res: Response,
 ) => {
     try {
         const { id } = req.params;
 
-        const substation = await prisma.substation.findFirst({
+        const feeder = await prisma.feeder.findFirst({
             where: {
                 id,
                 deletedAt: null,
             },
             include: {
-                zone: {
+                substation: {
                     select: {
                         id: true,
                         name: true,
                         code: true,
+                        zone: {
+                            select: {
+                                id: true,
+                                name: true,
+                                code: true,
+                            },
+                        },
                     },
                 },
             },
         });
 
-        if (!substation) {
+        if (!feeder) {
             return res.status(404).json({
                 success: false,
-                message: "Substation not found",
+                message: "Feeder not found",
             });
         }
 
         return res.status(200).json({
             success: true,
-            message: "Substation retrieved successfully",
-            data: substation,
+            message: "Feeder retrieved successfully",
+            data: feeder,
         });
     } catch (error) {
-        console.error("Get substation error:", error);
+        console.error("Get feeder error:", error);
 
         return res.status(500).json({
             success: false,
@@ -185,14 +206,14 @@ export const getSubstationById = async (
     }
 };
 
-export const updateSubstation = async (
+export const updateFeeder = async (
     req: Request<{ id: string }>,
     res: Response,
 ) => {
     try {
         const { id } = req.params;
 
-        const result = updateSubstationSchema.safeParse(req.body);
+        const result = updateFeederSchema.safeParse(req.body);
 
         if (!result.success) {
             return res.status(400).json({
@@ -202,17 +223,17 @@ export const updateSubstation = async (
             });
         }
 
-        const existingSubstation = await prisma.substation.findFirst({
+        const existingFeeder = await prisma.feeder.findFirst({
             where: {
                 id,
                 deletedAt: null,
             },
         });
 
-        if (!existingSubstation) {
+        if (!existingFeeder) {
             return res.status(404).json({
                 success: false,
-                message: "Substation not found",
+                message: "Feeder not found",
             });
         }
 
@@ -220,46 +241,44 @@ export const updateSubstation = async (
             name,
             code,
             description,
-            zoneId,
+            capacityMw,
+            substationId,
             status,
         } = result.data;
 
-        if (zoneId) {
-            const zone = await prisma.zone.findFirst({
+        if (substationId) {
+            const substation = await prisma.substation.findFirst({
                 where: {
-                    id: zoneId,
+                    id: substationId,
                     deletedAt: null,
                 },
             });
 
-            if (!zone) {
+            if (!substation) {
                 return res.status(404).json({
                     success: false,
-                    message: "Zone not found",
+                    message: "Substation not found",
                 });
             }
         }
 
-        if (name || code || zoneId) {
-            const targetZoneId = zoneId ?? existingSubstation.zoneId;
+        if (name || code || substationId) {
+            const targetSubstationId =
+                substationId ?? existingFeeder.substationId;
 
-            const duplicate = await prisma.substation.findFirst({
+            const duplicate = await prisma.feeder.findFirst({
                 where: {
                     id: {
                         not: id,
                     },
                     OR: [
                         ...(code
-                            ? [
-                                {
-                                    code: code.toUpperCase(),
-                                },
-                            ]
+                            ? [{ code: code.toUpperCase() }]
                             : []),
                         ...(name
                             ? [
                                 {
-                                    zoneId: targetZoneId,
+                                    substationId: targetSubstationId,
                                     name: {
                                         equals: name,
                                         mode: "insensitive" as const,
@@ -274,12 +293,12 @@ export const updateSubstation = async (
             if (duplicate) {
                 return res.status(409).json({
                     success: false,
-                    message: "Substation already exists",
+                    message: "Feeder already exists",
                 });
             }
         }
 
-        const updatedSubstation = await prisma.substation.update({
+        const feeder = await prisma.feeder.update({
             where: {
                 id,
             },
@@ -289,27 +308,19 @@ export const updateSubstation = async (
                     code: code.toUpperCase(),
                 }),
                 ...(description !== undefined && { description }),
-                ...(zoneId !== undefined && { zoneId }),
+                ...(capacityMw !== undefined && { capacityMw }),
+                ...(substationId !== undefined && { substationId }),
                 ...(status !== undefined && { status }),
-            },
-            include: {
-                zone: {
-                    select: {
-                        id: true,
-                        name: true,
-                        code: true,
-                    },
-                },
             },
         });
 
         return res.status(200).json({
             success: true,
-            message: "Substation updated successfully",
-            data: updatedSubstation,
+            message: "Feeder updated successfully",
+            data: feeder,
         });
     } catch (error) {
-        console.error("Update substation error:", error);
+        console.error("Update feeder error:", error);
 
         return res.status(500).json({
             success: false,
@@ -318,42 +329,28 @@ export const updateSubstation = async (
     }
 };
 
-export const deleteSubstation = async (
+export const deleteFeeder = async (
     req: Request<{ id: string }>,
     res: Response,
 ) => {
     try {
         const { id } = req.params;
 
-        const substation = await prisma.substation.findFirst({
+        const feeder = await prisma.feeder.findFirst({
             where: {
                 id,
                 deletedAt: null,
             },
         });
 
-        if (!substation) {
+        if (!feeder) {
             return res.status(404).json({
                 success: false,
-                message: "Substation not found",
+                message: "Feeder not found",
             });
         }
 
-        const feederCount = await prisma.feeder.count({
-            where: {
-                substationId: id,
-                deletedAt: null,
-            },
-        });
-
-        if (feederCount > 0) {
-            return res.status(409).json({
-                success: false,
-                message: "Substation cannot be deleted while it contains feeders",
-            });
-        }
-
-        await prisma.substation.update({
+        await prisma.feeder.update({
             where: {
                 id,
             },
@@ -364,10 +361,10 @@ export const deleteSubstation = async (
 
         return res.status(200).json({
             success: true,
-            message: "Substation deleted successfully",
+            message: "Feeder deleted successfully",
         });
     } catch (error) {
-        console.error("Delete substation error:", error);
+        console.error("Delete feeder error:", error);
 
         return res.status(500).json({
             success: false,
