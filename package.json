@@ -6,7 +6,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "stripe:webhook": "stripe listen --forward-to localhost:5000/api/v1/payments/webhook"
+    "build": "tsc",
+    "stripe:webhook": "stripe listen --forward-to localhost:5000/api/v1/payments/webhook",
+    "seed": "tsx prisma/seed.ts"
   },
   "repository": {
     "type": "git",
