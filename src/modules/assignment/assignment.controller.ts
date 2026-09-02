@@ -1,6 +1,12 @@
 import type { Request, Response } from "express";
 
 import { prisma } from "../../lib/prisma.js";
+
+import {
+    createNotificationSafely,
+    notifyIncidentCustomersSafely,
+} from "../notification/notification.service.js";
+
 import {
     assignOperatorSchema,
     assignmentQuerySchema,
@@ -83,7 +89,8 @@ export const assignOperator = async (
         ) {
             return res.status(409).json({
                 success: false,
-                message: "This operator is already assigned to the incident",
+                message:
+                    "This operator is already assigned to the incident",
             });
         }
 
@@ -124,6 +131,7 @@ export const assignOperator = async (
                     where: {
                         id: createdAssignment.id,
                     },
+
                     include: {
                         operator: {
                             select: {
@@ -157,11 +165,38 @@ export const assignOperator = async (
             },
         );
 
+        /*
+          Step 9:
+          Notify the newly assigned operator only after
+          the assignment transaction succeeds.
+        */
+        if (assignment) {
+            await createNotificationSafely({
+                recipientId: assignment.operator.id,
+
+                type: "ASSIGNMENT",
+
+                title: "New incident assignment",
+
+                message:
+                    `You have been assigned to ${assignment.incident.incidentCode}: ` +
+                    `${assignment.incident.title}.`,
+
+                entityType: "INCIDENT",
+                entityId: assignment.incident.id,
+
+                dedupeKey:
+                    `assignment-created-${assignment.id}`,
+            });
+        }
+
         return res.status(201).json({
             success: true,
+
             message: activeAssignment
                 ? "Incident reassigned successfully"
                 : "Operator assigned successfully",
+
             data: assignment,
         });
     } catch (error) {
@@ -179,7 +214,8 @@ export const getMyAssignments = async (
     res: Response,
 ) => {
     try {
-        const result = assignmentQuerySchema.safeParse(req.query);
+        const result =
+            assignmentQuerySchema.safeParse(req.query);
 
         if (!result.success) {
             return res.status(400).json({
@@ -195,53 +231,60 @@ export const getMyAssignments = async (
 
         const where = {
             operatorId,
-            ...(status && { status }),
+
+            ...(status && {
+                status,
+            }),
         };
 
-        const [assignments, total] = await Promise.all([
-            prisma.incidentAssignment.findMany({
-                where,
+        const [assignments, total] =
+            await Promise.all([
+                prisma.incidentAssignment.findMany({
+                    where,
 
-                include: {
-                    incident: {
-                        include: {
-                            area: {
-                                select: {
-                                    id: true,
-                                    name: true,
-                                    code: true,
-                                    priority: true,
+                    include: {
+                        incident: {
+                            include: {
+                                area: {
+                                    select: {
+                                        id: true,
+                                        name: true,
+                                        code: true,
+                                        priority: true,
+                                    },
                                 },
+                            },
+                        },
+
+                        assignedBy: {
+                            select: {
+                                id: true,
+                                name: true,
+                                role: true,
                             },
                         },
                     },
 
-                    assignedBy: {
-                        select: {
-                            id: true,
-                            name: true,
-                            role: true,
-                        },
+                    orderBy: {
+                        assignedAt: "desc",
                     },
-                },
 
-                orderBy: {
-                    assignedAt: "desc",
-                },
+                    skip: (page - 1) * limit,
+                    take: limit,
+                }),
 
-                skip: (page - 1) * limit,
-                take: limit,
-            }),
-
-            prisma.incidentAssignment.count({
-                where,
-            }),
-        ]);
+                prisma.incidentAssignment.count({
+                    where,
+                }),
+            ]);
 
         return res.status(200).json({
             success: true,
-            message: "Your assignments retrieved successfully",
+            message:
+                "Your assignments retrieved successfully",
+
             data: assignments,
+
             meta: {
                 page,
                 limit,
@@ -250,7 +293,10 @@ export const getMyAssignments = async (
             },
         });
     } catch (error) {
-        console.error("Get operator assignments error:", error);
+        console.error(
+            "Get operator assignments error:",
+            error,
+        );
 
         return res.status(500).json({
             success: false,
@@ -259,70 +305,76 @@ export const getMyAssignments = async (
     }
 };
 
-export const getIncidentAssignmentHistory = async (
-    req: Request<{ incidentId: string }>,
-    res: Response,
-) => {
-    try {
-        const { incidentId } = req.params;
+export const getIncidentAssignmentHistory =
+    async (
+        req: Request<{ incidentId: string }>,
+        res: Response,
+    ) => {
+        try {
+            const { incidentId } = req.params;
 
-        const incident = await prisma.outageIncident.findFirst({
-            where: {
-                id: incidentId,
-                deletedAt: null,
-            },
-        });
+            const incident =
+                await prisma.outageIncident.findFirst({
+                    where: {
+                        id: incidentId,
+                        deletedAt: null,
+                    },
+                });
 
-        if (!incident) {
-            return res.status(404).json({
+            if (!incident) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Outage incident not found",
+                });
+            }
+
+            const assignments =
+                await prisma.incidentAssignment.findMany({
+                    where: {
+                        incidentId,
+                    },
+
+                    include: {
+                        operator: {
+                            select: {
+                                id: true,
+                                name: true,
+                                email: true,
+                            },
+                        },
+
+                        assignedBy: {
+                            select: {
+                                id: true,
+                                name: true,
+                                role: true,
+                            },
+                        },
+                    },
+
+                    orderBy: {
+                        assignedAt: "desc",
+                    },
+                });
+
+            return res.status(200).json({
+                success: true,
+                message:
+                    "Incident assignment history retrieved successfully",
+                data: assignments,
+            });
+        } catch (error) {
+            console.error(
+                "Get assignment history error:",
+                error,
+            );
+
+            return res.status(500).json({
                 success: false,
-                message: "Outage incident not found",
+                message: "Internal server error",
             });
         }
-
-        const assignments =
-            await prisma.incidentAssignment.findMany({
-                where: {
-                    incidentId,
-                },
-
-                include: {
-                    operator: {
-                        select: {
-                            id: true,
-                            name: true,
-                            email: true,
-                        },
-                    },
-
-                    assignedBy: {
-                        select: {
-                            id: true,
-                            name: true,
-                            role: true,
-                        },
-                    },
-                },
-
-                orderBy: {
-                    assignedAt: "desc",
-                },
-            });
-
-        return res.status(200).json({
-            success: true,
-            message: "Incident assignment history retrieved successfully",
-            data: assignments,
-        });
-    } catch (error) {
-        console.error("Get assignment history error:", error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Internal server error",
-        });
-    }
-};
+    };
 
 export const acceptAssignment = async (
     req: Request<{ id: string }>,
@@ -336,6 +388,7 @@ export const acceptAssignment = async (
                 where: {
                     id,
                 },
+
                 include: {
                     incident: true,
                 },
@@ -348,24 +401,33 @@ export const acceptAssignment = async (
             });
         }
 
-        if (assignment.operatorId !== res.locals.user.id) {
+        if (
+            assignment.operatorId !==
+            res.locals.user.id
+        ) {
             return res.status(403).json({
                 success: false,
-                message: "This assignment does not belong to you",
+                message:
+                    "This assignment does not belong to you",
             });
         }
 
         if (assignment.status !== "ASSIGNED") {
             return res.status(400).json({
                 success: false,
-                message: "Only newly assigned work can be accepted",
+                message:
+                    "Only newly assigned work can be accepted",
             });
         }
 
-        if (assignment.incident.status !== "ASSIGNED") {
+        if (
+            assignment.incident.status !==
+            "ASSIGNED"
+        ) {
             return res.status(400).json({
                 success: false,
-                message: "Incident is not available for acceptance",
+                message:
+                    "Incident is not available for acceptance",
             });
         }
 
@@ -374,6 +436,7 @@ export const acceptAssignment = async (
                 where: {
                     id,
                 },
+
                 data: {
                     status: "ACCEPTED",
                     acceptedAt: new Date(),
@@ -382,11 +445,15 @@ export const acceptAssignment = async (
 
         return res.status(200).json({
             success: true,
-            message: "Assignment accepted successfully",
+            message:
+                "Assignment accepted successfully",
             data: updatedAssignment,
         });
     } catch (error) {
-        console.error("Accept assignment error:", error);
+        console.error(
+            "Accept assignment error:",
+            error,
+        );
 
         return res.status(500).json({
             success: false,
@@ -402,12 +469,13 @@ export const startIncidentWork = async (
     try {
         const { incidentId } = req.params;
 
-        const incident = await prisma.outageIncident.findFirst({
-            where: {
-                id: incidentId,
-                deletedAt: null,
-            },
-        });
+        const incident =
+            await prisma.outageIncident.findFirst({
+                where: {
+                    id: incidentId,
+                    deletedAt: null,
+                },
+            });
 
         if (!incident) {
             return res.status(404).json({
@@ -419,7 +487,8 @@ export const startIncidentWork = async (
         if (incident.status !== "ASSIGNED") {
             return res.status(400).json({
                 success: false,
-                message: "Only assigned incidents can be started",
+                message:
+                    "Only assigned incidents can be started",
             });
         }
 
@@ -430,6 +499,7 @@ export const startIncidentWork = async (
                     operatorId: res.locals.user.id,
                     status: "ACCEPTED",
                 },
+
                 orderBy: {
                     assignedAt: "desc",
                 },
@@ -449,6 +519,7 @@ export const startIncidentWork = async (
                     where: {
                         id: assignment.id,
                     },
+
                     data: {
                         workStartedAt: new Date(),
                     },
@@ -458,6 +529,7 @@ export const startIncidentWork = async (
                     where: {
                         id: incidentId,
                     },
+
                     data: {
                         status: "IN_PROGRESS",
                     },
@@ -467,11 +539,15 @@ export const startIncidentWork = async (
 
         return res.status(200).json({
             success: true,
-            message: "Incident work started successfully",
+            message:
+                "Incident work started successfully",
             data: started,
         });
     } catch (error) {
-        console.error("Start incident error:", error);
+        console.error(
+            "Start incident error:",
+            error,
+        );
 
         return res.status(500).json({
             success: false,
@@ -487,12 +563,13 @@ export const restoreIncident = async (
     try {
         const { incidentId } = req.params;
 
-        const incident = await prisma.outageIncident.findFirst({
-            where: {
-                id: incidentId,
-                deletedAt: null,
-            },
-        });
+        const incident =
+            await prisma.outageIncident.findFirst({
+                where: {
+                    id: incidentId,
+                    deletedAt: null,
+                },
+            });
 
         if (!incident) {
             return res.status(404).json({
@@ -504,7 +581,8 @@ export const restoreIncident = async (
         if (incident.status !== "IN_PROGRESS") {
             return res.status(400).json({
                 success: false,
-                message: "Only incidents in progress can be restored",
+                message:
+                    "Only incidents in progress can be restored",
             });
         }
 
@@ -514,10 +592,12 @@ export const restoreIncident = async (
                     incidentId,
                     operatorId: res.locals.user.id,
                     status: "ACCEPTED",
+
                     workStartedAt: {
                         not: null,
                     },
                 },
+
                 orderBy: {
                     assignedAt: "desc",
                 },
@@ -534,35 +614,59 @@ export const restoreIncident = async (
         const restoredAt = new Date();
 
         const restoredIncident =
-            await prisma.$transaction(async (tx) => {
-                await tx.incidentAssignment.update({
-                    where: {
-                        id: assignment.id,
-                    },
-                    data: {
-                        status: "COMPLETED",
-                        completedAt: restoredAt,
-                    },
-                });
+            await prisma.$transaction(
+                async (tx) => {
+                    await tx.incidentAssignment.update({
+                        where: {
+                            id: assignment.id,
+                        },
 
-                return tx.outageIncident.update({
-                    where: {
-                        id: incidentId,
-                    },
-                    data: {
-                        status: "RESTORED",
-                        restoredAt,
-                    },
-                });
-            });
+                        data: {
+                            status: "COMPLETED",
+                            completedAt: restoredAt,
+                        },
+                    });
+
+                    return tx.outageIncident.update({
+                        where: {
+                            id: incidentId,
+                        },
+
+                        data: {
+                            status: "RESTORED",
+                            restoredAt,
+                        },
+                    });
+                },
+            );
+
+        /*
+          Step 11:
+          Restoration has succeeded in the database.
+          Now notify all unique customers whose reports
+          belong to this incident.
+        */
+        await notifyIncidentCustomersSafely({
+            incidentId,
+
+            title: "Power restored",
+
+            message:
+                `Power restoration has been recorded for incident ` +
+                `${restoredIncident.incidentCode}.`,
+        });
 
         return res.status(200).json({
             success: true,
-            message: "Power restoration recorded successfully",
+            message:
+                "Power restoration recorded successfully",
             data: restoredIncident,
         });
     } catch (error) {
-        console.error("Restore incident error:", error);
+        console.error(
+            "Restore incident error:",
+            error,
+        );
 
         return res.status(500).json({
             success: false,
@@ -578,12 +682,13 @@ export const closeIncident = async (
     try {
         const { incidentId } = req.params;
 
-        const incident = await prisma.outageIncident.findFirst({
-            where: {
-                id: incidentId,
-                deletedAt: null,
-            },
-        });
+        const incident =
+            await prisma.outageIncident.findFirst({
+                where: {
+                    id: incidentId,
+                    deletedAt: null,
+                },
+            });
 
         if (!incident) {
             return res.status(404).json({
@@ -595,7 +700,8 @@ export const closeIncident = async (
         if (incident.status !== "RESTORED") {
             return res.status(400).json({
                 success: false,
-                message: "Only restored incidents can be closed",
+                message:
+                    "Only restored incidents can be closed",
             });
         }
 
@@ -604,6 +710,7 @@ export const closeIncident = async (
                 where: {
                     id: incidentId,
                 },
+
                 data: {
                     status: "CLOSED",
                     closedAt: new Date(),
@@ -616,7 +723,10 @@ export const closeIncident = async (
             data: closedIncident,
         });
     } catch (error) {
-        console.error("Close incident error:", error);
+        console.error(
+            "Close incident error:",
+            error,
+        );
 
         return res.status(500).json({
             success: false,
@@ -632,7 +742,8 @@ export const cancelIncident = async (
     try {
         const { incidentId } = req.params;
 
-        const result = cancelIncidentSchema.safeParse(req.body);
+        const result =
+            cancelIncidentSchema.safeParse(req.body);
 
         if (!result.success) {
             return res.status(400).json({
@@ -642,12 +753,13 @@ export const cancelIncident = async (
             });
         }
 
-        const incident = await prisma.outageIncident.findFirst({
-            where: {
-                id: incidentId,
-                deletedAt: null,
-            },
-        });
+        const incident =
+            await prisma.outageIncident.findFirst({
+                where: {
+                    id: incidentId,
+                    deletedAt: null,
+                },
+            });
 
         if (!incident) {
             return res.status(404).json({
@@ -656,7 +768,11 @@ export const cancelIncident = async (
             });
         }
 
-        if (!["OPEN", "ASSIGNED"].includes(incident.status)) {
+        if (
+            !["OPEN", "ASSIGNED"].includes(
+                incident.status,
+            )
+        ) {
             return res.status(400).json({
                 success: false,
                 message:
@@ -667,39 +783,53 @@ export const cancelIncident = async (
         const cancelledAt = new Date();
 
         const cancelledIncident =
-            await prisma.$transaction(async (tx) => {
-                await tx.incidentAssignment.updateMany({
-                    where: {
-                        incidentId,
-                        status: {
-                            in: ["ASSIGNED", "ACCEPTED"],
-                        },
-                    },
-                    data: {
-                        status: "CANCELLED",
-                        cancelledAt,
-                    },
-                });
+            await prisma.$transaction(
+                async (tx) => {
+                    await tx.incidentAssignment.updateMany({
+                        where: {
+                            incidentId,
 
-                return tx.outageIncident.update({
-                    where: {
-                        id: incidentId,
-                    },
-                    data: {
-                        status: "CANCELLED",
-                        cancelledAt,
-                        cancellationReason: result.data.reason,
-                    },
-                });
-            });
+                            status: {
+                                in: [
+                                    "ASSIGNED",
+                                    "ACCEPTED",
+                                ],
+                            },
+                        },
+
+                        data: {
+                            status: "CANCELLED",
+                            cancelledAt,
+                        },
+                    });
+
+                    return tx.outageIncident.update({
+                        where: {
+                            id: incidentId,
+                        },
+
+                        data: {
+                            status: "CANCELLED",
+                            cancelledAt,
+
+                            cancellationReason:
+                                result.data.reason,
+                        },
+                    });
+                },
+            );
 
         return res.status(200).json({
             success: true,
-            message: "Incident cancelled successfully",
+            message:
+                "Incident cancelled successfully",
             data: cancelledIncident,
         });
     } catch (error) {
-        console.error("Cancel incident error:", error);
+        console.error(
+            "Cancel incident error:",
+            error,
+        );
 
         return res.status(500).json({
             success: false,

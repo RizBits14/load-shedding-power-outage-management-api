@@ -9,6 +9,8 @@ import {
     updateBillSchema,
 } from "./bill.validation.js";
 
+import { createNotificationSafely } from "../notification/notification.service.js";
+
 const calculateTotal = (
     energyCharge: number,
     serviceCharge: number,
@@ -151,6 +153,24 @@ export const createBill = async (
                     },
                 },
             },
+        });
+
+        await createNotificationSafely({
+            recipientId: bill.customer.id,
+
+            type: "BILL",
+
+            title: "New electricity bill",
+
+            message:
+                `Bill ${bill.billNumber} has been generated. ` +
+                `Amount due: ${bill.totalAmount} ${bill.currency}.`,
+
+            entityType: "BILL",
+            entityId: bill.id,
+
+            dedupeKey:
+                `bill-created-${bill.id}`,
         });
 
         return res.status(201).json({

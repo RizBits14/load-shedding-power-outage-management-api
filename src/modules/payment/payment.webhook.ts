@@ -1,17 +1,28 @@
-import type { Request, Response } from "express";
+import type {
+    Request,
+    Response,
+} from "express";
+
 import type Stripe from "stripe";
 
 import { prisma } from "../../lib/prisma.js";
 import { getStripe } from "../../lib/stripe.js";
 
+import { createNotificationSafely } from "../notification/notification.service.js";
+
 const getPaymentIntentId = (
-    paymentIntent: string | Stripe.PaymentIntent | null,
+    paymentIntent:
+        | string
+        | Stripe.PaymentIntent
+        | null,
 ) => {
     if (!paymentIntent) {
         return undefined;
     }
 
-    if (typeof paymentIntent === "string") {
+    if (
+        typeof paymentIntent === "string"
+    ) {
         return paymentIntent;
     }
 
@@ -22,10 +33,13 @@ export const stripeWebhook = async (
     req: Request,
     res: Response,
 ) => {
-    const signature = req.headers["stripe-signature"];
+    const signature =
+        req.headers["stripe-signature"];
 
     if (typeof signature !== "string") {
-        return res.status(400).send("Missing Stripe signature");
+        return res
+            .status(400)
+            .send("Missing Stripe signature");
     }
 
     const webhookSecret =
@@ -42,11 +56,12 @@ export const stripeWebhook = async (
     let event: Stripe.Event;
 
     try {
-        event = stripe.webhooks.constructEvent(
-            req.body,
-            signature,
-            webhookSecret,
-        );
+        event =
+            stripe.webhooks.constructEvent(
+                req.body,
+                signature,
+                webhookSecret,
+            );
     } catch (error) {
         console.error(
             "Stripe webhook signature verification failed:",
@@ -59,6 +74,10 @@ export const stripeWebhook = async (
     }
 
     try {
+        /*
+          Stripe can retry the same webhook.
+          Check whether this event was already processed.
+        */
         const processedEvent =
             await prisma.stripeWebhookEvent.findUnique({
                 where: {
@@ -73,60 +92,117 @@ export const stripeWebhook = async (
             });
         }
 
+        /*
+          Successful Stripe Checkout payment.
+        */
         if (
-            event.type === "checkout.session.completed" ||
+            event.type ===
+            "checkout.session.completed" ||
             event.type ===
             "checkout.session.async_payment_succeeded"
         ) {
             const session =
-                event.data.object as Stripe.Checkout.Session;
+                event.data
+                    .object as Stripe.Checkout.Session;
 
-            if (session.payment_status === "paid") {
+            if (
+                session.payment_status === "paid"
+            ) {
                 const payment =
                     await prisma.payment.findFirst({
                         where: {
-                            stripeSessionId: session.id,
+                            stripeSessionId:
+                                session.id,
                         },
                     });
 
                 if (payment) {
                     const paidAt = new Date();
 
-                    await prisma.$transaction(async (tx) => {
-                        await tx.stripeWebhookEvent.create({
-                            data: {
-                                stripeEventId: event.id,
-                                type: event.type,
-                            },
-                        });
+                    /*
+                      Important business transaction:
+          
+                      1. Save webhook event
+                      2. Mark payment SUCCEEDED
+                      3. Mark electricity bill PAID
+          
+                      All three succeed or fail together.
+                    */
+                    await prisma.$transaction(
+                        async (tx) => {
+                            await tx.stripeWebhookEvent.create({
+                                data: {
+                                    stripeEventId:
+                                        event.id,
 
-                        await tx.payment.update({
-                            where: {
-                                id: payment.id,
-                            },
+                                    type:
+                                        event.type,
+                                },
+                            });
 
-                            data: {
-                                status: "SUCCEEDED",
-                                paidAt,
+                            await tx.payment.update({
+                                where: {
+                                    id: payment.id,
+                                },
 
-                                stripePaymentIntentId:
-                                    getPaymentIntentId(
-                                        session.payment_intent,
-                                    ),
-                            },
-                        });
+                                data: {
+                                    status:
+                                        "SUCCEEDED",
 
-                        await tx.electricityBill.updateMany({
-                            where: {
-                                id: payment.billId,
-                                status: "UNPAID",
-                            },
+                                    paidAt,
 
-                            data: {
-                                status: "PAID",
-                                paidAt,
-                            },
-                        });
+                                    stripePaymentIntentId:
+                                        getPaymentIntentId(
+                                            session.payment_intent,
+                                        ),
+                                },
+                            });
+
+                            await tx.electricityBill.updateMany({
+                                where: {
+                                    id:
+                                        payment.billId,
+
+                                    status:
+                                        "UNPAID",
+                                },
+
+                                data: {
+                                    status: "PAID",
+                                    paidAt,
+                                },
+                            });
+                        },
+                    );
+
+                    /*
+                      Step 12:
+          
+                      Payment and bill updates have already
+                      succeeded.
+          
+                      Notification happens afterwards so a
+                      notification problem cannot roll back
+                      a real successful Stripe payment.
+                    */
+                    await createNotificationSafely({
+                        recipientId:
+                            payment.customerId,
+
+                        type: "PAYMENT",
+
+                        title:
+                            "Payment successful",
+
+                        message:
+                            "Your electricity bill payment was completed successfully.",
+
+                        entityType: "BILL",
+                        entityId:
+                            payment.billId,
+
+                        dedupeKey:
+                            `payment-success-${payment.id}`,
                     });
 
                     return res.status(200).json({
@@ -136,69 +212,104 @@ export const stripeWebhook = async (
             }
         }
 
+        /*
+          Asynchronous payment failed.
+        */
         if (
             event.type ===
             "checkout.session.async_payment_failed"
         ) {
             const session =
-                event.data.object as Stripe.Checkout.Session;
+                event.data
+                    .object as Stripe.Checkout.Session;
 
-            await prisma.$transaction(async (tx) => {
-                await tx.stripeWebhookEvent.create({
-                    data: {
-                        stripeEventId: event.id,
-                        type: event.type,
-                    },
-                });
+            await prisma.$transaction(
+                async (tx) => {
+                    await tx.stripeWebhookEvent.create({
+                        data: {
+                            stripeEventId:
+                                event.id,
 
-                await tx.payment.updateMany({
-                    where: {
-                        stripeSessionId: session.id,
-                        status: "PENDING",
-                    },
+                            type:
+                                event.type,
+                        },
+                    });
 
-                    data: {
-                        status: "FAILED",
-                        failedAt: new Date(),
-                    },
-                });
-            });
+                    await tx.payment.updateMany({
+                        where: {
+                            stripeSessionId:
+                                session.id,
+
+                            status:
+                                "PENDING",
+                        },
+
+                        data: {
+                            status: "FAILED",
+                            failedAt: new Date(),
+                        },
+                    });
+                },
+            );
 
             return res.status(200).json({
                 received: true,
             });
         }
 
-        if (event.type === "checkout.session.expired") {
+        /*
+          Checkout session expired without
+          completing payment.
+        */
+        if (
+            event.type ===
+            "checkout.session.expired"
+        ) {
             const session =
-                event.data.object as Stripe.Checkout.Session;
+                event.data
+                    .object as Stripe.Checkout.Session;
 
-            await prisma.$transaction(async (tx) => {
-                await tx.stripeWebhookEvent.create({
-                    data: {
-                        stripeEventId: event.id,
-                        type: event.type,
-                    },
-                });
+            await prisma.$transaction(
+                async (tx) => {
+                    await tx.stripeWebhookEvent.create({
+                        data: {
+                            stripeEventId:
+                                event.id,
 
-                await tx.payment.updateMany({
-                    where: {
-                        stripeSessionId: session.id,
-                        status: "PENDING",
-                    },
+                            type:
+                                event.type,
+                        },
+                    });
 
-                    data: {
-                        status: "CANCELLED",
-                        cancelledAt: new Date(),
-                    },
-                });
-            });
+                    await tx.payment.updateMany({
+                        where: {
+                            stripeSessionId:
+                                session.id,
+
+                            status:
+                                "PENDING",
+                        },
+
+                        data: {
+                            status:
+                                "CANCELLED",
+
+                            cancelledAt:
+                                new Date(),
+                        },
+                    });
+                },
+            );
 
             return res.status(200).json({
                 received: true,
             });
         }
 
+        /*
+          Store Stripe events that PowerSync currently
+          does not need special processing for.
+        */
         await prisma.stripeWebhookEvent.create({
             data: {
                 stripeEventId: event.id,
@@ -210,7 +321,10 @@ export const stripeWebhook = async (
             received: true,
         });
     } catch (error) {
-        console.error("Stripe webhook processing error:", error);
+        console.error(
+            "Stripe webhook processing error:",
+            error,
+        );
 
         return res.status(500).json({
             received: false,

@@ -89,6 +89,15 @@ enum PaymentStatus {
   CANCELLED
 }
 
+enum NotificationType {
+  OUTAGE_REPORT
+  INCIDENT
+  ASSIGNMENT
+  BILL
+  PAYMENT
+  SYSTEM
+}
+
 model User {
   id       String  @id @default(cuid())
   name     String
@@ -114,6 +123,8 @@ model User {
   createdBills ElectricityBill[] @relation("BillCreatedBy")
 
   payments Payment[] @relation("CustomerPayments")
+
+  notifications Notification[] @relation("UserNotifications")
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -437,4 +448,31 @@ model StripeWebhookEvent {
 
   @@index([type])
   @@index([processedAt])
+}
+
+model Notification {
+  id      String           @id @default(cuid())
+  type    NotificationType
+  title   String
+  message String
+
+  recipientId String
+  recipient   User   @relation("UserNotifications", fields: [recipientId], references: [id])
+
+  entityType String?
+  entityId   String?
+
+  dedupeKey String? @unique
+
+  isRead Boolean   @default(false)
+  readAt DateTime?
+
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  @@index([recipientId])
+  @@index([recipientId, isRead])
+  @@index([type])
+  @@index([createdAt])
+  @@index([deletedAt])
 }
