@@ -18,8 +18,11 @@ import analyticsRouter from "./modules/analytics/analytics.route.js";
 import notificationRouter from "./modules/notification/notification.route.js";
 import auditRouter from "./modules/audit/audit.route.js";
 import googleAuthRouter from "./modules/auth/google-auth.route.js";
+import { apiRateLimiter, authRateLimiter, corsMiddleware, securityHeaders } from "./middlewares/security.middleware.js";
+import { globalErrorHandler, notFoundHandler } from "./middlewares/error.middleware.js";
 
 const app = express();
+app.set("trust proxy", 1);
 
 app.use(
     "/api/v1/payments/webhook",
@@ -29,10 +32,41 @@ app.use(
     paymentWebhookRouter,
 );
 
+app.use(securityHeaders);
+
+app.use(corsMiddleware);
+
+app.use(
+    express.json({
+        limit: "1mb",
+    }),
+);
+
+app.use(
+    express.urlencoded({
+        extended: true,
+        limit: "1mb",
+    }),
+);
+
+app.use(
+    "/api/v1",
+    apiRateLimiter,
+);
+
 app.use(express.json());
 
-app.use("/api/v1/auth", authRouter);
-app.use("/api/v1/auth", googleAuthRouter);
+app.use(
+    "/api/v1/auth",
+    authRateLimiter,
+    authRouter,
+);
+
+app.use(
+    "/api/v1/auth",
+    authRateLimiter,
+    googleAuthRouter,
+);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/zones", zoneRouter);
 app.use("/api/v1/substations", substationRouter);
@@ -70,11 +104,8 @@ app.use(
     auditRouter,
 );
 
-app.use((_req, res) => {
-    res.status(404).json({
-        success: false,
-        message: "Route not found",
-    });
-});
+app.use(notFoundHandler);
+
+app.use(globalErrorHandler);
 
 export default app;

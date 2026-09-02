@@ -167,11 +167,6 @@ export const assignOperator = async (
             },
         );
 
-        /*
-          Step 9:
-          Notify the newly assigned operator only after
-          the assignment transaction succeeds.
-        */
         if (assignment) {
             await createNotificationSafely({
                 recipientId: assignment.operator.id,

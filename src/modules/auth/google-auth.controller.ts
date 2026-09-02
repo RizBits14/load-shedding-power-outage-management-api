@@ -28,14 +28,6 @@ const createPowerSyncToken = (user: {
         );
     }
 
-    /*
-      Both id and userId are included intentionally.
-  
-      This keeps the Google-issued PowerSync token
-      compatible with the existing authentication
-      middleware regardless of which identifier name
-      that middleware currently reads.
-    */
     return jwt.sign(
         {
             id: user.id,
@@ -155,15 +147,6 @@ export const googleLogin = async (
             });
         }
 
-        /*
-          Lookup is intentionally performed using
-          both googleId and email.
-    
-          This supports:
-          1. Returning Google users.
-          2. Existing local users who later choose
-             "Continue with Google".
-        */
         let user =
             await prisma.user.findFirst({
                 where: {
@@ -182,10 +165,6 @@ export const googleLogin = async (
         let auditAction =
             "GOOGLE_LOGIN";
 
-        /*
-          Existing user:
-          Link Google account if necessary.
-        */
         if (user) {
             if (user.deletedAt) {
                 return res.status(403).json({
@@ -206,12 +185,6 @@ export const googleLogin = async (
                 });
             }
 
-            /*
-              The email matched an account that is already
-              connected to a different Google subject ID.
-      
-              Do not silently overwrite that relationship.
-            */
             if (
                 user.googleId &&
                 user.googleId !== googleId
@@ -239,13 +212,6 @@ export const googleLogin = async (
                     "GOOGLE_ACCOUNT_LINKED";
             }
         } else {
-            /*
-              Brand-new Google users always start as
-              CUSTOMER.
-      
-              Google login must never allow somebody
-              to self-create an OPERATOR or ADMIN.
-            */
             user =
                 await prisma.user.create({
                     data: {

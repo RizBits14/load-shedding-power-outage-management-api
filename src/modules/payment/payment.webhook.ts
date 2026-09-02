@@ -76,10 +76,6 @@ export const stripeWebhook = async (
     }
 
     try {
-        /*
-          Stripe can retry the same webhook.
-          Check whether this event was already processed.
-        */
         const processedEvent =
             await prisma.stripeWebhookEvent.findUnique({
                 where: {
@@ -94,9 +90,6 @@ export const stripeWebhook = async (
             });
         }
 
-        /*
-          Successful Stripe Checkout payment.
-        */
         if (
             event.type ===
             "checkout.session.completed" ||
@@ -121,15 +114,6 @@ export const stripeWebhook = async (
                 if (payment) {
                     const paidAt = new Date();
 
-                    /*
-                      Important business transaction:
-          
-                      1. Save webhook event
-                      2. Mark payment SUCCEEDED
-                      3. Mark electricity bill PAID
-          
-                      All three succeed or fail together.
-                    */
                     await prisma.$transaction(
                         async (tx) => {
                             await tx.stripeWebhookEvent.create({
@@ -234,9 +218,6 @@ export const stripeWebhook = async (
             }
         }
 
-        /*
-          Asynchronous payment failed.
-        */
         if (
             event.type ===
             "checkout.session.async_payment_failed"
@@ -279,10 +260,6 @@ export const stripeWebhook = async (
             });
         }
 
-        /*
-          Checkout session expired without
-          completing payment.
-        */
         if (
             event.type ===
             "checkout.session.expired"
@@ -328,10 +305,6 @@ export const stripeWebhook = async (
             });
         }
 
-        /*
-          Store Stripe events that PowerSync currently
-          does not need special processing for.
-        */
         await prisma.stripeWebhookEvent.create({
             data: {
                 stripeEventId: event.id,

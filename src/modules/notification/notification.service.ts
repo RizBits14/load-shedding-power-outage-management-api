@@ -38,14 +38,6 @@ export const createNotification = async (
     });
 };
 
-/*
-  Notifications should not cause the main business operation
-  to fail.
-
-  For example:
-  payment should still succeed even if creating a notification
-  encounters an unexpected error.
-*/
 export const createNotificationSafely = async (
     data: CreateNotificationInput,
 ) => {

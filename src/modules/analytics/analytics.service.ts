@@ -162,28 +162,6 @@ export const getAreaReliabilityData = async (
                     0,
                 ) / totalIncidents;
 
-        /*
-          Explainable reliability formula:
-    
-          Start at 100.
-    
-          Frequency penalty:
-          More incidents reduce reliability.
-          Maximum penalty = 30.
-    
-          Duration penalty:
-          Longer restoration time reduces reliability.
-          Maximum penalty = 30.
-    
-          Severity penalty:
-          More severe incidents reduce reliability.
-          Maximum penalty = 20.
-    
-          Active incident penalty:
-          Current unresolved incidents reduce reliability.
-          Maximum penalty = 20.
-        */
-
         const frequencyPenalty = Math.min(
             totalIncidents * 5,
             30,
