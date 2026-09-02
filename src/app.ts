@@ -14,6 +14,7 @@ import assignmentRouter from "./modules/assignment/assignment.route.js";
 import billRouter from "./modules/bill/bill.route.js";
 import paymentRouter from "./modules/payment/payment.route.js";
 import paymentWebhookRouter from "./modules/payment/payment-webhook.route.js";
+import analyticsRouter from "./modules/analytics/analytics.route.js";
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use("/api/v1/incidents", incidentRouter);
 app.use("/api/v1/assignments", assignmentRouter);
 app.use("/api/v1/bills", billRouter);
 app.use("/api/v1/payments", paymentRouter);
+app.use("/api/v1/analytics", analyticsRouter);
 
 app.get("/api/v1/health", async (_req, res) => {
     await prisma.$queryRaw`SELECT 1`;
