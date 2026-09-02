@@ -12,8 +12,18 @@ import outageReportRouter from "./modules/outage-report/outage-report.route.js";
 import incidentRouter from "./modules/incident/incident.route.js";
 import assignmentRouter from "./modules/assignment/assignment.route.js";
 import billRouter from "./modules/bill/bill.route.js";
+import paymentRouter from "./modules/payment/payment.route.js";
+import paymentWebhookRouter from "./modules/payment/payment-webhook.route.js";
 
 const app = express();
+
+app.use(
+    "/api/v1/payments/webhook",
+    express.raw({
+        type: "application/json",
+    }),
+    paymentWebhookRouter,
+);
 
 app.use(express.json());
 
@@ -29,6 +39,7 @@ app.use("/api/v1/outage-reports", outageReportRouter);
 app.use("/api/v1/incidents", incidentRouter);
 app.use("/api/v1/assignments", assignmentRouter);
 app.use("/api/v1/bills", billRouter);
+app.use("/api/v1/payments", paymentRouter);
 
 app.get("/api/v1/health", async (_req, res) => {
     await prisma.$queryRaw`SELECT 1`;

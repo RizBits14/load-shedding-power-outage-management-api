@@ -82,6 +82,13 @@ enum BillStatus {
   CANCELLED
 }
 
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
 model User {
   id       String  @id @default(cuid())
   name     String
@@ -105,6 +112,8 @@ model User {
 
   bills        ElectricityBill[] @relation("CustomerBills")
   createdBills ElectricityBill[] @relation("BillCreatedBy")
+
+  payments Payment[] @relation("CustomerPayments")
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -378,6 +387,8 @@ model ElectricityBill {
   createdById String
   createdBy   User   @relation("BillCreatedBy", fields: [createdById], references: [id])
 
+  payments Payment[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -388,4 +399,42 @@ model ElectricityBill {
   @@index([dueDate])
   @@index([billingYear, billingMonth])
   @@index([createdAt])
+}
+
+model Payment {
+  id       String        @id @default(cuid())
+  status   PaymentStatus @default(PENDING)
+  amount   Decimal       @db.Decimal(12, 2)
+  currency String        @default("BDT")
+
+  stripeSessionId       String? @unique
+  stripePaymentIntentId String? @unique
+
+  billId String
+  bill   ElectricityBill @relation(fields: [billId], references: [id])
+
+  customerId String
+  customer   User   @relation("CustomerPayments", fields: [customerId], references: [id])
+
+  paidAt      DateTime?
+  failedAt    DateTime?
+  cancelledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([billId])
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model StripeWebhookEvent {
+  id            String   @id @default(cuid())
+  stripeEventId String   @unique
+  type          String
+  processedAt   DateTime @default(now())
+
+  @@index([type])
+  @@index([processedAt])
 }
