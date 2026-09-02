@@ -16,3 +16,19 @@ export const createSubstationSchema = z
         zoneId: z.string().min(1, "Zone ID is required"),
     })
     .strict();
+
+export const updateSubstationSchema = createSubstationSchema
+    .omit({
+        zoneId: true,
+    })
+    .partial()
+    .extend({
+        zoneId: z.string().min(1, "Zone ID is required").optional(),
+
+        status: z
+            .enum(["ACTIVE", "MAINTENANCE", "INACTIVE"])
+            .optional(),
+    })
+    .refine((data) => Object.keys(data).length > 0, {
+        message: "At least one field is required",
+    });

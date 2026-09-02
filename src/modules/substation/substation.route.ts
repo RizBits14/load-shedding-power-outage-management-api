@@ -7,6 +7,8 @@ import {
     createSubstation,
     getSubstationById,
     getSubstations,
+    deleteSubstation,
+    updateSubstation,
 } from "./substation.controller.js";
 
 const router = Router();
@@ -20,6 +22,20 @@ router.post(
     authenticate,
     authorize("ADMIN"),
     createSubstation,
+);
+
+router.patch(
+    "/:id",
+    authenticate,
+    authorize("ADMIN"),
+    updateSubstation,
+);
+
+router.delete(
+    "/:id",
+    authenticate,
+    authorize("ADMIN"),
+    deleteSubstation,
 );
 
 export default router;

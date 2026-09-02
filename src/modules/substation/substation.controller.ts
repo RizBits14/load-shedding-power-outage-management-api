@@ -1,7 +1,10 @@
 import type { Request, Response } from "express";
 
 import { prisma } from "../../lib/prisma.js";
-import { createSubstationSchema } from "./substation.validation.js";
+import {
+    createSubstationSchema,
+    updateSubstationSchema,
+} from "./substation.validation.js";
 
 export const createSubstation = async (
     req: Request,
@@ -174,6 +177,183 @@ export const getSubstationById = async (
         });
     } catch (error) {
         console.error("Get substation error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
+    }
+};
+
+export const updateSubstation = async (
+    req: Request<{ id: string }>,
+    res: Response,
+) => {
+    try {
+        const { id } = req.params;
+
+        const result = updateSubstationSchema.safeParse(req.body);
+
+        if (!result.success) {
+            return res.status(400).json({
+                success: false,
+                message: "Validation failed",
+                errors: result.error.flatten(),
+            });
+        }
+
+        const existingSubstation = await prisma.substation.findFirst({
+            where: {
+                id,
+                deletedAt: null,
+            },
+        });
+
+        if (!existingSubstation) {
+            return res.status(404).json({
+                success: false,
+                message: "Substation not found",
+            });
+        }
+
+        const {
+            name,
+            code,
+            description,
+            zoneId,
+            status,
+        } = result.data;
+
+        if (zoneId) {
+            const zone = await prisma.zone.findFirst({
+                where: {
+                    id: zoneId,
+                    deletedAt: null,
+                },
+            });
+
+            if (!zone) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Zone not found",
+                });
+            }
+        }
+
+        if (name || code || zoneId) {
+            const targetZoneId = zoneId ?? existingSubstation.zoneId;
+
+            const duplicate = await prisma.substation.findFirst({
+                where: {
+                    id: {
+                        not: id,
+                    },
+                    OR: [
+                        ...(code
+                            ? [
+                                {
+                                    code: code.toUpperCase(),
+                                },
+                            ]
+                            : []),
+                        ...(name
+                            ? [
+                                {
+                                    zoneId: targetZoneId,
+                                    name: {
+                                        equals: name,
+                                        mode: "insensitive" as const,
+                                    },
+                                },
+                            ]
+                            : []),
+                    ],
+                },
+            });
+
+            if (duplicate) {
+                return res.status(409).json({
+                    success: false,
+                    message: "Substation already exists",
+                });
+            }
+        }
+
+        const updatedSubstation = await prisma.substation.update({
+            where: {
+                id,
+            },
+            data: {
+                ...(name !== undefined && { name }),
+                ...(code !== undefined && {
+                    code: code.toUpperCase(),
+                }),
+                ...(description !== undefined && { description }),
+                ...(zoneId !== undefined && { zoneId }),
+                ...(status !== undefined && { status }),
+            },
+            include: {
+                zone: {
+                    select: {
+                        id: true,
+                        name: true,
+                        code: true,
+                    },
+                },
+            },
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Substation updated successfully",
+            data: updatedSubstation,
+        });
+    } catch (error) {
+        console.error("Update substation error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
+    }
+};
+
+export const deleteSubstation = async (
+    req: Request<{ id: string }>,
+    res: Response,
+) => {
+    try {
+        const { id } = req.params;
+
+        const substation = await prisma.substation.findFirst({
+            where: {
+                id,
+                deletedAt: null,
+            },
+        });
+
+        if (!substation) {
+            return res.status(404).json({
+                success: false,
+                message: "Substation not found",
+            });
+        }
+
+        await prisma.substation.update({
+            where: {
+                id,
+            },
+            data: {
+                deletedAt: new Date(),
+            },
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Substation deleted successfully",
+        });
+    } catch (error) {
+        console.error("Delete substation error:", error);
 
         return res.status(500).json({
             success: false,
