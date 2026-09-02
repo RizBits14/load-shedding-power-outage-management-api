@@ -5,6 +5,8 @@ import { prisma } from "../../lib/prisma.js";
 
 import { incidentQuerySchema } from "./incident.validation.js";
 
+import { createAuditLogSafely } from "../audit/audit.service.js";
+
 export const createIncidentFromReport = async (
     req: Request<{ reportId: string }>,
     res: Response,
@@ -192,6 +194,44 @@ export const createIncidentFromReport = async (
                 });
             },
         );
+
+        if (incident) {
+            await createAuditLogSafely({
+                req,
+
+                actorId:
+                    res.locals.user.id,
+
+                actorRole:
+                    res.locals.user.role,
+
+                action:
+                    "INCIDENT_CLUSTER_CREATED",
+
+                entityType:
+                    "INCIDENT",
+
+                entityId:
+                    incident.id,
+
+                description:
+                    `Incident ${incident.incidentCode} was created from clustered outage reports.`,
+
+                metadata: {
+                    areaId:
+                        incident.area.id,
+
+                    linkedReportCount:
+                        incident.reports.length,
+
+                    severity:
+                        incident.severity,
+
+                    priorityScore:
+                        incident.priorityScore,
+                },
+            });
+        }
 
         return res.status(201).json({
             success: true,

@@ -16,6 +16,7 @@ import paymentRouter from "./modules/payment/payment.route.js";
 import paymentWebhookRouter from "./modules/payment/payment-webhook.route.js";
 import analyticsRouter from "./modules/analytics/analytics.route.js";
 import notificationRouter from "./modules/notification/notification.route.js";
+import auditRouter from "./modules/audit/audit.route.js";
 
 const app = express();
 
@@ -60,6 +61,11 @@ app.get("/api/v1/health", async (_req, res) => {
 app.use(
     "/api/v1/notifications",
     notificationRouter,
+);
+
+app.use(
+    "/api/v1/audit-logs",
+    auditRouter,
 );
 
 app.use((_req, res) => {

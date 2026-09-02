@@ -126,6 +126,8 @@ model User {
 
   notifications Notification[] @relation("UserNotifications")
 
+  auditLogs AuditLog[] @relation("ActorAuditLogs")
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -475,4 +477,33 @@ model Notification {
   @@index([type])
   @@index([createdAt])
   @@index([deletedAt])
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  actorId String?
+  actor   User?   @relation("ActorAuditLogs", fields: [actorId], references: [id], onDelete: SetNull)
+
+  actorRole Role?
+
+  action      String
+  entityType  String
+  entityId    String?
+  description String
+
+  method    String?
+  path      String?
+  ipAddress String?
+  userAgent String?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([entityType])
+  @@index([entityType, entityId])
+  @@index([createdAt])
 }

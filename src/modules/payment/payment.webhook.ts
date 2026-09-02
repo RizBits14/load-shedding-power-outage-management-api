@@ -10,6 +10,8 @@ import { getStripe } from "../../lib/stripe.js";
 
 import { createNotificationSafely } from "../notification/notification.service.js";
 
+import { createAuditLogSafely } from "../audit/audit.service.js";
+
 const getPaymentIntentId = (
     paymentIntent:
         | string
@@ -175,16 +177,6 @@ export const stripeWebhook = async (
                         },
                     );
 
-                    /*
-                      Step 12:
-          
-                      Payment and bill updates have already
-                      succeeded.
-          
-                      Notification happens afterwards so a
-                      notification problem cannot roll back
-                      a real successful Stripe payment.
-                    */
                     await createNotificationSafely({
                         recipientId:
                             payment.customerId,
@@ -203,6 +195,36 @@ export const stripeWebhook = async (
 
                         dedupeKey:
                             `payment-success-${payment.id}`,
+                    });
+
+                    await createAuditLogSafely({
+                        req,
+
+                        action:
+                            "PAYMENT_SUCCEEDED",
+
+                        entityType:
+                            "PAYMENT",
+
+                        entityId:
+                            payment.id,
+
+                        description:
+                            `Stripe payment ${payment.id} completed successfully.`,
+
+                        metadata: {
+                            customerId:
+                                payment.customerId,
+
+                            billId:
+                                payment.billId,
+
+                            stripeSessionId:
+                                session.id,
+
+                            stripeEventId:
+                                event.id,
+                        },
                     });
 
                     return res.status(200).json({

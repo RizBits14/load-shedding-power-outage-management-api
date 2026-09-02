@@ -7,6 +7,8 @@ import {
     notificationQuerySchema,
 } from "./notification.validation.js";
 
+import { createAuditLogSafely } from "../audit/audit.service.js";
+
 export const getMyNotifications = async (
     req: Request,
     res: Response,
@@ -360,6 +362,33 @@ export const broadcastNotification = async (
                         `broadcast-${broadcastId}-${user.id}`,
                 })),
             });
+
+        await createAuditLogSafely({
+            req,
+
+            actorId:
+                res.locals.user.id,
+
+            actorRole:
+                res.locals.user.role,
+
+            action:
+                "SYSTEM_NOTIFICATION_BROADCAST",
+
+            entityType:
+                "NOTIFICATION",
+
+            description:
+                "Administrator sent a system notification broadcast.",
+
+            metadata: {
+                recipientRole,
+                recipientCount:
+                    created.count,
+
+                title,
+            },
+        });
 
         return res.status(201).json({
             success: true,

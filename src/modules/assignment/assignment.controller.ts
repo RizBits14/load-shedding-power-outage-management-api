@@ -7,6 +7,8 @@ import {
     notifyIncidentCustomersSafely,
 } from "../notification/notification.service.js";
 
+import { createAuditLogSafely } from "../audit/audit.service.js";
+
 import {
     assignOperatorSchema,
     assignmentQuerySchema,
@@ -187,6 +189,45 @@ export const assignOperator = async (
 
                 dedupeKey:
                     `assignment-created-${assignment.id}`,
+            });
+        }
+
+        if (assignment) {
+            await createAuditLogSafely({
+                req,
+
+                actorId:
+                    res.locals.user.id,
+
+                actorRole:
+                    res.locals.user.role,
+
+                action:
+                    activeAssignment
+                        ? "INCIDENT_REASSIGNED"
+                        : "INCIDENT_ASSIGNED",
+
+                entityType:
+                    "INCIDENT",
+
+                entityId:
+                    assignment.incident.id,
+
+                description:
+                    activeAssignment
+                        ? `Incident ${assignment.incident.incidentCode} was reassigned.`
+                        : `Operator was assigned to incident ${assignment.incident.incidentCode}.`,
+
+                metadata: {
+                    assignmentId:
+                        assignment.id,
+
+                    operatorId:
+                        assignment.operator.id,
+
+                    previousAssignmentId:
+                        activeAssignment?.id ?? null,
+                },
             });
         }
 
@@ -640,12 +681,6 @@ export const restoreIncident = async (
                 },
             );
 
-        /*
-          Step 11:
-          Restoration has succeeded in the database.
-          Now notify all unique customers whose reports
-          belong to this incident.
-        */
         await notifyIncidentCustomersSafely({
             incidentId,
 
@@ -654,6 +689,33 @@ export const restoreIncident = async (
             message:
                 `Power restoration has been recorded for incident ` +
                 `${restoredIncident.incidentCode}.`,
+        });
+
+        await createAuditLogSafely({
+            req,
+
+            actorId:
+                res.locals.user.id,
+
+            actorRole:
+                res.locals.user.role,
+
+            action:
+                "INCIDENT_RESTORED",
+
+            entityType:
+                "INCIDENT",
+
+            entityId:
+                restoredIncident.id,
+
+            description:
+                `Power restoration was recorded for incident ${restoredIncident.incidentCode}.`,
+
+            metadata: {
+                restoredAt:
+                    restoredAt.toISOString(),
+            },
         });
 
         return res.status(200).json({
@@ -716,6 +778,28 @@ export const closeIncident = async (
                     closedAt: new Date(),
                 },
             });
+
+        await createAuditLogSafely({
+            req,
+
+            actorId:
+                res.locals.user.id,
+
+            actorRole:
+                res.locals.user.role,
+
+            action:
+                "INCIDENT_CLOSED",
+
+            entityType:
+                "INCIDENT",
+
+            entityId:
+                closedIncident.id,
+
+            description:
+                `Incident ${closedIncident.incidentCode} was closed.`,
+        });
 
         return res.status(200).json({
             success: true,
@@ -818,6 +902,33 @@ export const cancelIncident = async (
                     });
                 },
             );
+
+        await createAuditLogSafely({
+            req,
+
+            actorId:
+                res.locals.user.id,
+
+            actorRole:
+                res.locals.user.role,
+
+            action:
+                "INCIDENT_CANCELLED",
+
+            entityType:
+                "INCIDENT",
+
+            entityId:
+                cancelledIncident.id,
+
+            description:
+                `Incident ${cancelledIncident.incidentCode} was cancelled.`,
+
+            metadata: {
+                reason:
+                    result.data.reason,
+            },
+        });
 
         return res.status(200).json({
             success: true,

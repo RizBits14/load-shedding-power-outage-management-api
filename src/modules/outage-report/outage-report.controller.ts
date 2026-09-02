@@ -10,6 +10,8 @@ import {
     reviewOutageReportSchema,
 } from "./outage-report.validation.js";
 
+import { createAuditLogSafely } from "../audit/audit.service.js";
+
 export const createOutageReport = async (
     req: Request,
     res: Response,
@@ -513,11 +515,6 @@ export const reviewOutageReport = async (
                 },
             });
 
-        /*
-          Step 10:
-          The review was successfully saved.
-          Now notify the customer.
-        */
         await createNotificationSafely({
             recipientId:
                 updatedReport.customerId,
@@ -544,6 +541,38 @@ export const reviewOutageReport = async (
 
             dedupeKey:
                 `outage-review-${updatedReport.id}-${updatedReport.status}`,
+        });
+
+        await createAuditLogSafely({
+            req,
+
+            actorId:
+                res.locals.user.id,
+
+            actorRole:
+                res.locals.user.role,
+
+            action:
+                updatedReport.status === "VERIFIED"
+                    ? "OUTAGE_REPORT_VERIFIED"
+                    : "OUTAGE_REPORT_REJECTED",
+
+            entityType:
+                "OUTAGE_REPORT",
+
+            entityId:
+                updatedReport.id,
+
+            description:
+                `Outage report ${updatedReport.id} was ${updatedReport.status.toLowerCase()}.`,
+
+            metadata: {
+                areaId:
+                    updatedReport.areaId,
+
+                reviewNote:
+                    updatedReport.reviewNote ?? null,
+            },
         });
 
         return res.status(200).json({

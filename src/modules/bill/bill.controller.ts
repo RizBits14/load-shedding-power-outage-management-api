@@ -11,6 +11,8 @@ import {
 
 import { createNotificationSafely } from "../notification/notification.service.js";
 
+import { createAuditLogSafely } from "../audit/audit.service.js";
+
 const calculateTotal = (
     energyCharge: number,
     serviceCharge: number,
@@ -171,6 +173,45 @@ export const createBill = async (
 
             dedupeKey:
                 `bill-created-${bill.id}`,
+        });
+
+        await createAuditLogSafely({
+            req,
+
+            actorId:
+                res.locals.user.id,
+
+            actorRole:
+                res.locals.user.role,
+
+            action:
+                "BILL_CREATED",
+
+            entityType:
+                "BILL",
+
+            entityId:
+                bill.id,
+
+            description:
+                `Electricity bill ${bill.billNumber} was created.`,
+
+            metadata: {
+                customerId:
+                    bill.customer.id,
+
+                billingMonth:
+                    bill.billingMonth,
+
+                billingYear:
+                    bill.billingYear,
+
+                totalAmount:
+                    Number(bill.totalAmount),
+
+                currency:
+                    bill.currency,
+            },
         });
 
         return res.status(201).json({
@@ -561,6 +602,35 @@ export const updateBill = async (
                 },
             });
 
+        await createAuditLogSafely({
+            req,
+
+            actorId:
+                res.locals.user.id,
+
+            actorRole:
+                res.locals.user.role,
+
+            action:
+                "BILL_UPDATED",
+
+            entityType:
+                "BILL",
+
+            entityId:
+                updatedBill.id,
+
+            description:
+                `Electricity bill ${updatedBill.billNumber} was updated.`,
+
+            metadata: {
+                totalAmount:
+                    Number(
+                        updatedBill.totalAmount,
+                    ),
+            },
+        });
+
         return res.status(200).json({
             success: true,
             message: "Electricity bill updated successfully",
@@ -625,6 +695,33 @@ export const cancelBill = async (
                     cancellationReason: result.data.reason,
                 },
             });
+
+        await createAuditLogSafely({
+            req,
+
+            actorId:
+                res.locals.user.id,
+
+            actorRole:
+                res.locals.user.role,
+
+            action:
+                "BILL_CANCELLED",
+
+            entityType:
+                "BILL",
+
+            entityId:
+                cancelledBill.id,
+
+            description:
+                `Electricity bill ${cancelledBill.billNumber} was cancelled.`,
+
+            metadata: {
+                reason:
+                    result.data.reason,
+            },
+        });
 
         return res.status(200).json({
             success: true,
