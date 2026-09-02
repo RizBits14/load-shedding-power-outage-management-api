@@ -11,6 +11,7 @@ import scheduleRouter from "./modules/schedule/schedule.route.js";
 import outageReportRouter from "./modules/outage-report/outage-report.route.js";
 import incidentRouter from "./modules/incident/incident.route.js";
 import assignmentRouter from "./modules/assignment/assignment.route.js";
+import billRouter from "./modules/bill/bill.route.js";
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use("/api/v1/schedules", scheduleRouter);
 app.use("/api/v1/outage-reports", outageReportRouter);
 app.use("/api/v1/incidents", incidentRouter);
 app.use("/api/v1/assignments", assignmentRouter);
+app.use("/api/v1/bills", billRouter);
 
 app.get("/api/v1/health", async (_req, res) => {
     await prisma.$queryRaw`SELECT 1`;
