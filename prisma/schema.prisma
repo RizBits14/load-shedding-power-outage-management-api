@@ -39,6 +39,8 @@ model User {
   role     Role       @default(CUSTOMER)
   status   UserStatus @default(ACTIVE)
 
+  customerProfile CustomerProfile?
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -122,6 +124,8 @@ model Area {
   feederId String
   feeder   Feeder @relation(fields: [feederId], references: [id])
 
+  customers CustomerProfile[]
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -130,4 +134,22 @@ model Area {
   @@index([feederId])
   @@index([priority])
   @@index([deletedAt])
+}
+
+model CustomerProfile {
+  id String @id @default(cuid())
+
+  phone   String?
+  address String?
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  areaId String
+  area   Area   @relation(fields: [areaId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([areaId])
 }
