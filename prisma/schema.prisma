@@ -24,6 +24,12 @@ enum InfrastructureStatus {
   INACTIVE
 }
 
+enum AreaPriority {
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
 model User {
   id       String     @id @default(cuid())
   name     String
@@ -94,8 +100,34 @@ model Feeder {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
+  areas Area[]
+
   @@unique([substationId, name])
   @@index([substationId])
   @@index([status])
+  @@index([deletedAt])
+}
+
+model Area {
+  id          String  @id @default(cuid())
+  name        String
+  code        String  @unique
+  description String?
+
+  priority AreaPriority @default(NORMAL)
+
+  latitude  Float?
+  longitude Float?
+
+  feederId String
+  feeder   Feeder @relation(fields: [feederId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([feederId, name])
+  @@index([feederId])
+  @@index([priority])
   @@index([deletedAt])
 }

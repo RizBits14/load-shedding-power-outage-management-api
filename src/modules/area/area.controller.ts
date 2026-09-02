@@ -2,16 +2,16 @@ import type { Request, Response } from "express";
 
 import { prisma } from "../../lib/prisma.js";
 import {
-    createFeederSchema,
-    updateFeederSchema,
-} from "./feeder.validation.js";
+    createAreaSchema,
+    updateAreaSchema,
+} from "./area.validation.js";
 
-export const createFeeder = async (
+export const createArea = async (
     req: Request,
     res: Response,
 ) => {
     try {
-        const result = createFeederSchema.safeParse(req.body);
+        const result = createAreaSchema.safeParse(req.body);
 
         if (!result.success) {
             return res.status(400).json({
@@ -25,34 +25,36 @@ export const createFeeder = async (
             name,
             code,
             description,
-            capacityMw,
-            substationId,
+            priority,
+            latitude,
+            longitude,
+            feederId,
         } = result.data;
 
-        const substation = await prisma.substation.findFirst({
+        const feeder = await prisma.feeder.findFirst({
             where: {
-                id: substationId,
+                id: feederId,
                 deletedAt: null,
             },
         });
 
-        if (!substation) {
+        if (!feeder) {
             return res.status(404).json({
                 success: false,
-                message: "Substation not found",
+                message: "Feeder not found",
             });
         }
 
         const normalizedCode = code.toUpperCase();
 
-        const duplicate = await prisma.feeder.findFirst({
+        const duplicate = await prisma.area.findFirst({
             where: {
                 OR: [
                     {
                         code: normalizedCode,
                     },
                     {
-                        substationId,
+                        feederId,
                         name: {
                             equals: name,
                             mode: "insensitive",
@@ -65,29 +67,38 @@ export const createFeeder = async (
         if (duplicate) {
             return res.status(409).json({
                 success: false,
-                message: "Feeder already exists",
+                message: "Area already exists",
             });
         }
 
-        const feeder = await prisma.feeder.create({
+        const area = await prisma.area.create({
             data: {
                 name,
                 code: normalizedCode,
                 description,
-                capacityMw,
-                substationId,
+                priority,
+                latitude,
+                longitude,
+                feederId,
             },
             include: {
-                substation: {
+                feeder: {
                     select: {
                         id: true,
                         name: true,
                         code: true,
-                        zone: {
+                        substation: {
                             select: {
                                 id: true,
                                 name: true,
                                 code: true,
+                                zone: {
+                                    select: {
+                                        id: true,
+                                        name: true,
+                                        code: true,
+                                    },
+                                },
                             },
                         },
                     },
@@ -97,11 +108,11 @@ export const createFeeder = async (
 
         return res.status(201).json({
             success: true,
-            message: "Feeder created successfully",
-            data: feeder,
+            message: "Area created successfully",
+            data: area,
         });
     } catch (error) {
-        console.error("Create feeder error:", error);
+        console.error("Create area error:", error);
 
         return res.status(500).json({
             success: false,
@@ -110,23 +121,23 @@ export const createFeeder = async (
     }
 };
 
-export const getFeeders = async (
+export const getAreas = async (
     req: Request,
     res: Response,
 ) => {
     try {
-        const substationId =
-            typeof req.query.substationId === "string"
-                ? req.query.substationId
+        const feederId =
+            typeof req.query.feederId === "string"
+                ? req.query.feederId
                 : undefined;
 
-        const feeders = await prisma.feeder.findMany({
+        const areas = await prisma.area.findMany({
             where: {
                 deletedAt: null,
-                ...(substationId && { substationId }),
+                ...(feederId && { feederId }),
             },
             include: {
-                substation: {
+                feeder: {
                     select: {
                         id: true,
                         name: true,
@@ -141,11 +152,11 @@ export const getFeeders = async (
 
         return res.status(200).json({
             success: true,
-            message: "Feeders retrieved successfully",
-            data: feeders,
+            message: "Areas retrieved successfully",
+            data: areas,
         });
     } catch (error) {
-        console.error("Get feeders error:", error);
+        console.error("Get areas error:", error);
 
         return res.status(500).json({
             success: false,
@@ -154,29 +165,36 @@ export const getFeeders = async (
     }
 };
 
-export const getFeederById = async (
+export const getAreaById = async (
     req: Request<{ id: string }>,
     res: Response,
 ) => {
     try {
         const { id } = req.params;
 
-        const feeder = await prisma.feeder.findFirst({
+        const area = await prisma.area.findFirst({
             where: {
                 id,
                 deletedAt: null,
             },
             include: {
-                substation: {
+                feeder: {
                     select: {
                         id: true,
                         name: true,
                         code: true,
-                        zone: {
+                        substation: {
                             select: {
                                 id: true,
                                 name: true,
                                 code: true,
+                                zone: {
+                                    select: {
+                                        id: true,
+                                        name: true,
+                                        code: true,
+                                    },
+                                },
                             },
                         },
                     },
@@ -184,20 +202,20 @@ export const getFeederById = async (
             },
         });
 
-        if (!feeder) {
+        if (!area) {
             return res.status(404).json({
                 success: false,
-                message: "Feeder not found",
+                message: "Area not found",
             });
         }
 
         return res.status(200).json({
             success: true,
-            message: "Feeder retrieved successfully",
-            data: feeder,
+            message: "Area retrieved successfully",
+            data: area,
         });
     } catch (error) {
-        console.error("Get feeder error:", error);
+        console.error("Get area error:", error);
 
         return res.status(500).json({
             success: false,
@@ -206,14 +224,14 @@ export const getFeederById = async (
     }
 };
 
-export const updateFeeder = async (
+export const updateArea = async (
     req: Request<{ id: string }>,
     res: Response,
 ) => {
     try {
         const { id } = req.params;
 
-        const result = updateFeederSchema.safeParse(req.body);
+        const result = updateAreaSchema.safeParse(req.body);
 
         if (!result.success) {
             return res.status(400).json({
@@ -223,17 +241,17 @@ export const updateFeeder = async (
             });
         }
 
-        const existingFeeder = await prisma.feeder.findFirst({
+        const existingArea = await prisma.area.findFirst({
             where: {
                 id,
                 deletedAt: null,
             },
         });
 
-        if (!existingFeeder) {
+        if (!existingArea) {
             return res.status(404).json({
                 success: false,
-                message: "Feeder not found",
+                message: "Area not found",
             });
         }
 
@@ -241,32 +259,33 @@ export const updateFeeder = async (
             name,
             code,
             description,
-            capacityMw,
-            substationId,
-            status,
+            priority,
+            latitude,
+            longitude,
+            feederId,
         } = result.data;
 
-        if (substationId) {
-            const substation = await prisma.substation.findFirst({
+        if (feederId) {
+            const feeder = await prisma.feeder.findFirst({
                 where: {
-                    id: substationId,
+                    id: feederId,
                     deletedAt: null,
                 },
             });
 
-            if (!substation) {
+            if (!feeder) {
                 return res.status(404).json({
                     success: false,
-                    message: "Substation not found",
+                    message: "Feeder not found",
                 });
             }
         }
 
-        if (name || code || substationId) {
-            const targetSubstationId =
-                substationId ?? existingFeeder.substationId;
+        if (name || code || feederId) {
+            const targetFeederId =
+                feederId ?? existingArea.feederId;
 
-            const duplicate = await prisma.feeder.findFirst({
+            const duplicate = await prisma.area.findFirst({
                 where: {
                     id: {
                         not: id,
@@ -275,10 +294,11 @@ export const updateFeeder = async (
                         ...(code
                             ? [{ code: code.toUpperCase() }]
                             : []),
+
                         ...(name
                             ? [
                                 {
-                                    substationId: targetSubstationId,
+                                    feederId: targetFeederId,
                                     name: {
                                         equals: name,
                                         mode: "insensitive" as const,
@@ -293,34 +313,51 @@ export const updateFeeder = async (
             if (duplicate) {
                 return res.status(409).json({
                     success: false,
-                    message: "Feeder already exists",
+                    message: "Area already exists",
                 });
             }
         }
 
-        const feeder = await prisma.feeder.update({
+        const area = await prisma.area.update({
             where: {
                 id,
             },
             data: {
                 ...(name !== undefined && { name }),
+
                 ...(code !== undefined && {
                     code: code.toUpperCase(),
                 }),
-                ...(description !== undefined && { description }),
-                ...(capacityMw !== undefined && { capacityMw }),
-                ...(substationId !== undefined && { substationId }),
-                ...(status !== undefined && { status }),
+
+                ...(description !== undefined && {
+                    description,
+                }),
+
+                ...(priority !== undefined && {
+                    priority,
+                }),
+
+                ...(latitude !== undefined && {
+                    latitude,
+                }),
+
+                ...(longitude !== undefined && {
+                    longitude,
+                }),
+
+                ...(feederId !== undefined && {
+                    feederId,
+                }),
             },
         });
 
         return res.status(200).json({
             success: true,
-            message: "Feeder updated successfully",
-            data: feeder,
+            message: "Area updated successfully",
+            data: area,
         });
     } catch (error) {
-        console.error("Update feeder error:", error);
+        console.error("Update area error:", error);
 
         return res.status(500).json({
             success: false,
@@ -329,42 +366,28 @@ export const updateFeeder = async (
     }
 };
 
-export const deleteFeeder = async (
+export const deleteArea = async (
     req: Request<{ id: string }>,
     res: Response,
 ) => {
     try {
         const { id } = req.params;
 
-        const feeder = await prisma.feeder.findFirst({
+        const area = await prisma.area.findFirst({
             where: {
                 id,
                 deletedAt: null,
             },
         });
 
-        if (!feeder) {
+        if (!area) {
             return res.status(404).json({
                 success: false,
-                message: "Feeder not found",
+                message: "Area not found",
             });
         }
 
-        const areaCount = await prisma.area.count({
-            where: {
-                feederId: id,
-                deletedAt: null,
-            },
-        });
-
-        if (areaCount > 0) {
-            return res.status(409).json({
-                success: false,
-                message: "Feeder cannot be deleted while it contains areas",
-            });
-        }
-
-        await prisma.feeder.update({
+        await prisma.area.update({
             where: {
                 id,
             },
@@ -375,10 +398,10 @@ export const deleteFeeder = async (
 
         return res.status(200).json({
             success: true,
-            message: "Feeder deleted successfully",
+            message: "Area deleted successfully",
         });
     } catch (error) {
-        console.error("Delete feeder error:", error);
+        console.error("Delete area error:", error);
 
         return res.status(500).json({
             success: false,
