@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "stripe:webhook": "stripe listen --forward-to localhost:5000/api/v1/payments/webhook",
     "seed": "tsx prisma/seed.ts"
   },
