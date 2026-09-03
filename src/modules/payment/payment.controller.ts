@@ -309,9 +309,33 @@ export const paymentCancelCallback = async (
             });
         }
 
+        let message: string;
+
+        switch (payment.status) {
+            case "SUCCEEDED":
+                message =
+                    "Payment has already been completed successfully";
+                break;
+
+            case "CANCELLED":
+                message =
+                    "Stripe Checkout was cancelled";
+                break;
+
+            case "FAILED":
+                message =
+                    "Payment attempt has failed";
+                break;
+
+            default:
+                message =
+                    "Stripe Checkout was exited before payment completion";
+                break;
+        }
+
         return res.status(200).json({
             success: true,
-            message: "Stripe Checkout was cancelled",
+            message,
             data: payment,
         });
     } catch (error) {
@@ -322,7 +346,8 @@ export const paymentCancelCallback = async (
 
         return res.status(500).json({
             success: false,
-            message: "Unable to process cancelled checkout",
+            message:
+                "Unable to process cancelled checkout",
         });
     }
 };
