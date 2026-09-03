@@ -271,6 +271,8 @@ export const getIncidents = async (
             severity,
             areaId,
             search,
+            sortBy,
+            sortOrder,
         } = result.data;
 
         const where = {
@@ -327,14 +329,30 @@ export const getIncidents = async (
                     },
                 },
 
-                orderBy: [
-                    {
-                        priorityScore: "desc",
-                    },
-                    {
-                        createdAt: "desc",
-                    },
-                ],
+                orderBy:
+                    sortBy === "createdAt"
+                        ? [
+                            {
+                                createdAt: sortOrder,
+                            },
+                        ]
+                        : sortBy === "startedAt"
+                            ? [
+                                {
+                                    startedAt: sortOrder,
+                                },
+                                {
+                                    createdAt: "desc",
+                                },
+                            ]
+                            : [
+                                {
+                                    priorityScore: sortOrder,
+                                },
+                                {
+                                    createdAt: "desc",
+                                },
+                            ],
 
                 skip: (page - 1) * limit,
                 take: limit,

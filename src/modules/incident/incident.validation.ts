@@ -34,5 +34,20 @@ export const incidentQuerySchema = z
         areaId: z.string().optional(),
 
         search: z.string().trim().min(1).optional(),
+
+        sortBy: z
+            .enum([
+                "priorityScore",
+                "createdAt",
+                "startedAt",
+            ])
+            .default("priorityScore"),
+
+        sortOrder: z
+            .enum([
+                "asc",
+                "desc",
+            ])
+            .default("desc"),
     })
     .strict();
