@@ -209,19 +209,6 @@ export const getAreaById = async (
             });
         }
 
-        const customerCount = await prisma.customerProfile.count({
-            where: {
-                areaId: id,
-            },
-        });
-
-        if (customerCount > 0) {
-            return res.status(409).json({
-                success: false,
-                message: "Area cannot be deleted while customers are assigned to it",
-            });
-        }
-
         return res.status(200).json({
             success: true,
             message: "Area retrieved successfully",
@@ -397,6 +384,19 @@ export const deleteArea = async (
             return res.status(404).json({
                 success: false,
                 message: "Area not found",
+            });
+        }
+
+        const customerCount = await prisma.customerProfile.count({
+            where: {
+                areaId: id,
+            },
+        });
+
+        if (customerCount > 0) {
+            return res.status(409).json({
+                success: false,
+                message: "Area cannot be deleted while customers are assigned to it",
             });
         }
 
